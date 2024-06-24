@@ -1,0 +1,17 @@
+[package]
+name = "libra-types"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.86"
+ascent = "0.6.0"
+bitvec = "1.0.1"
+fxhash = "0.2.1"
+indexmap = "2.2.6"
+rpds = "1.1.0"
+smol_str = "0.2.2"
+thiserror = "1.0.61"
+tinyvec = "1.6.1"
