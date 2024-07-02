@@ -1,0 +1,20 @@
+expr = { expr_fun | expr_let | expr_apply | int | ident }
+expr_apply = { "(" ~ expr+ ~ ")" }
+expr_fun = { "(" ~ "fn" ~ "(" ~ ident+ ~ ")" ~ expr ~ ")" }
+expr_let = { "(" ~ "let" ~ "(" ~ ident ~ expr ~ ")" ~ expr ~ ")" }
+
+keyword = @{ "let" | "fn" }
+ident = @{ !(keyword) ~ ident_char_first ~ ident_char* }
+ident_char_first = @{ ASCII_ALPHA | "_" }
+ident_char = @{ ident_char_first | ASCII_DIGIT }
+
+int = @{ ("+" | "-")? ~ ASCII_DIGIT+ }
+nat = @{ ASCII_DIGIT+ }
+
+WHITESPACE = _{ " " | "\t" | "\n" | "\r" }
+
+type = { type_var | type_int | type_fun }
+type_var = @{ "?" ~ nat }
+type_int = { "int" }
+type_fun = { "(" ~ "->" ~ type ~ type ~ ")" }
+

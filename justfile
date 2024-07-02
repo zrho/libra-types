@@ -4,6 +4,11 @@ all: build doc
 build:
     cargo build
 
+# run tests
+test:
+    cargo test
+    cargo test --example simple
+
 # generate all documentation
 doc: doc-api doc-book
 

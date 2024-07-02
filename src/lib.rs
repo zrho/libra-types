@@ -1,95 +1,10 @@
 //! Libra is a library for building constraint based type inference engines.
 //! For an overview of the type language, see [`Type`].
 //!
-//! # Constraint Based Type Inference
-//!
-//! The intended usage of Libra is to infer or check the types of a program
-//! in three stages:
-//!
-//!  1. **Constraint Generation:** We traverse the input program and generate
-//!     types and type constraints in a [`TypeSet`] that together describe the type inference
-//!     problem associated to the program. During this process we keep track of
-//!     the association between locations in the program and the [`TypeIndex`]s
-//!     in the [`TypeSet`] that should correspond to the type of that program location.
-//!  2. **Constraint Solving:** Once all types and constraints are collected in the
-//!     [`TypeSet`], we solve the type constraints. The [`TypeSet`] keeps track of
-//!     constraints that remain unsolved. For any such constraint, a user provided
-//!     procedure uses unification to incorporate the knowledge encoded in the
-//!     constraint into the [`TypeSet`]. The procedure can then decide whether to
-//!     consider the constraint solved, to signal an error or to postpone solving
-//!     the constraint to when more information becomes known.
-//!     Postponed constraints are reawakened when one of their referenced types changes.
-//!  3. **Elaboration:** After all constraints are solved, we extract the type information
-//!     from the [`TypeSet`] to generate a program representation with type annotations.
-//!     This step uses the association between [`TypeIndex`]s and program locations that
-//!     has been recorded in the constraint generation step.
-//!
 //! The names of type constructors and of row labels are drawn from a
 //! user-specified type `L` that must implement [`Copy`] and [`Eq`].
 //! This is intended to be used together with
 //! [string interning](https://en.wikipedia.org/wiki/String_interning).
-//!
-//! # The Type System
-//!
-//! ## Polymorphism
-//!
-//! We believe that [let should not be generalised](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/tldi10-vytiniotis.pdf).
-//! Classical Hindley Milner type systems perform type generalisation at local
-//! let bindings. Unfortunately this system is incompatible with a general
-//! and extensible constraint system. We therefore do not implement support
-//! for local implicit generalisation in libra. That design choice also paves
-//! the way for potential future support of [local assumptions](https://simon.peytonjones.org/outsideinx/).
-//!
-//! ## Rows
-//!
-//! Libra supports a form of row types with
-//! [scoped labels](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/scopedlabels.pdf).
-//! Rows can be used to model (extensible) record types and variant types.
-//! A row is a sequence of row cons cells, specifying a label, a type and the
-//! rest of the row.
-//! Depending on the type that the row ends in, we classify rows as follows:
-//!
-//!  - **Closed Row:** The sequence ends in an empty row.
-//!  - **Open Row:** The sequence ends in a row variable.
-//!  - **Improper Row:** The sequence ends in a type that is not a row.
-//!
-//! Entries with different labels can be exchanged freely, while the order
-//! of entries with the same label must be preserved.
-//! This avoids label conflicts when using row polymorphism.
-//! In cases where duplicate labels are not desired, this can be enforced
-//! by using custom constraints.
-//! We currently do not support rows with
-//! [first class labels](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/fclabels.pdf)
-//! directly, but this feature can be (partly) simulated using constraints as well.
-//!
-//! # Type Errors
-//!
-//! A type inference engine should not only work when the program is well-typed,
-//! but also allow for diagnostics in case of a type error.
-//! Producing helpful diagnostics is a difficult and underspecified problem.
-//! Classical implementations of Hindley Milner type inference stop at the first
-//! type error that is encountered, which due to the non-local nature of unification
-//! may also be far from the location of the actual mistake in the code.
-//!
-//! Libra is designed to be used with the
-//! [Mycroft](https://dl.acm.org/doi/abs/10.1145/3022671.2983994)
-//! approach to error reporting.
-//! When Libra encounters an error, it can produce an *unsatisfiable core*, i.e.
-//! a subset of the type constraints which can not be simultaneously satisfied.
-//! The unsatisfiable core can then be used to selectively disable individual
-//! constraints until a (close to) minimal set of constraints is found without
-//! which the type inference problem is satisfiable.
-//! These error constraints can then be used to produce the appropriate error messages.
-//! This approach for error reporting was chosen since it can produce decent
-//! quality type errors, does not stop at the first error but reports multiple
-//! errors, and allows for extensibility in the constraint language.
-//!
-//! In the case of an error, Mycroft runs the type inference engine many times.
-//! Depending on the size of the program and the complexity of the custom
-//! constraint language, this process may be slow.
-//! For situations where high quality error messages are not necessary,
-//! the repeated resolving may be skipped and the ill-typed program rejected
-//! immediately.
 //!
 //! # Usage Examples
 //!
@@ -155,51 +70,59 @@ where
         }
     }
 
-    /// Insert a type constructor with the given number of type arguments.
-    ///
-    /// A fresh type variable is generated for every type argument.
-    /// To set an argument to a specific type, this type variable can be unified
-    /// with the other type by using [`TypeSet::unify`]. This is guaranteed to
-    /// succeed for the first time that the variable is unified.
+    /// Insert a type constructor.
     ///
     /// # Example
     ///
     /// ```
-    /// # use libra_types::TypeSet;
+    /// # use libra_types::{TypeSet, Type};
     /// let mut types = TypeSet::<u32>::new();
     ///
     /// const TYPE_INT: u32 = 0;
-    /// const TYPE_ARRAY: u32 = 1;
+    /// const TYPE_MAP: u32 = 1;
     ///
-    /// let (int, _) = types.insert_ctr(TYPE_INT, 0);
-    /// let (array, array_children) = types.insert_ctr(TYPE_ARRAY, 1);
+    /// let (int, _) = types.insert_ctr(TYPE_INT, []);
+    /// let (_, map_args) = types.insert_ctr(TYPE_MAP, [Some(int), None]);
     ///
-    /// types.unify(array_children.get(0), int).unwrap();
+    /// assert_eq!(types.canonical(map_args.get(0)), types.canonical(int));
+    /// assert!(matches!(types.get(map_args.get(1)), Type::Var(_)));
     /// ```
-    pub fn insert_ctr(&mut self, label: L, args: usize) -> (TypeIndex, Children) {
-        let index = self.insert_slot(TypeSlot::Ctr(label, args as u16), State::Inert);
+    pub fn insert_ctr<I>(&mut self, label: L, args: I) -> (TypeIndex, Children)
+    where
+        I: IntoIterator<Item = Option<TypeIndex>>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        let args = args.into_iter();
+        let arity = args.len() as u16;
+        let index = self.insert_slot(TypeSlot::Ctr(label, arity), State::Inert);
 
-        for i in 0..args {
-            self.insert_slot(TypeSlot::Arg(i as u16), State::Inert);
+        for (i, arg) in args.enumerate() {
+            let arg_index = self.insert_slot(TypeSlot::Arg(i as u16), State::Inert);
+
+            if let Some(arg_given) = arg {
+                // This unification always succeeds since `arg_index` is a fresh type variable.
+                self.unify(arg_given, arg_index).unwrap();
+            }
         }
 
-        let children = Children {
-            index,
-            len: args as u16,
-        };
-
+        let children = Children { index, len: arity };
         (index, children)
     }
 
-    /// Insert a type constraint with the given number of type arguments.
+    /// Insert a type constraint.
     ///
     /// This method works analogously to [`TypeSet::insert_ctr`], except that
     /// it additionally marks the inserted type constructor as an active constraint.
     /// In particular the index of the newly inserted constraint will be returned
     /// by [`TypeSet::pop_active`] at some point so that the constraint can be discharged.
-    pub fn insert_con(&mut self, label: L, args: usize) -> (TypeIndex, Children) {
+    pub fn insert_con<I>(&mut self, label: L, args: I) -> (TypeIndex, Children)
+    where
+        I: IntoIterator<Item = Option<TypeIndex>>,
+        I::IntoIter: ExactSizeIterator,
+    {
         let (index, children) = self.insert_ctr(label, args);
         self.types[index.index()].state = State::Active;
+        self.active.push(index);
         (index, children)
     }
 
@@ -253,7 +176,21 @@ where
     /// When the type index is not part of this type set.    
     #[inline]
     pub fn get(&self, index: TypeIndex) -> Type<L> {
-        self.get_type_internal(self.canonical(index))
+        let t = self.get_type_internal(self.canonical(index));
+
+        if let Type::Var(_) = t {
+            for i in self.uf.iter_class(index.index()) {
+                match self.types[i].slot {
+                    TypeSlot::Ctr(_, _)
+                    | TypeSlot::RowEmpty
+                    | TypeSlot::RowCons(_)
+                    | TypeSlot::Error => panic!(),
+                    _ => {}
+                }
+            }
+        }
+
+        t
     }
 
     /// Returns a debug representation of the type at a given index.
@@ -357,11 +294,15 @@ where
     }
 
     fn unify_check_cycle(&mut self, start: TypeIndex) -> Result<(), SolveError> {
+        let start = self.canonical(start);
+
         // TODO: Reuse these allocations?
         let mut stack: Vec<_> = self.parents(start).collect();
         let mut visited = FxHashSet::default();
 
         while let Some(index) = stack.pop() {
+            let index = self.canonical(index);
+
             if !visited.insert(index) {
                 continue;
             }
@@ -510,7 +451,10 @@ where
                 continue;
             }
 
-            assert_eq!(self.types[index.index()].state, State::Active);
+            if self.types[index.index()].state != State::Active {
+                continue;
+            }
+
             self.types[index.index()].state = State::Deferred;
 
             let Type::Ctr(label, cs) = self.get(index) else {
