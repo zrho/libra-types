@@ -123,9 +123,12 @@
 use fxhash::FxHashSet;
 use std::{iter::FusedIterator, ops::Range};
 use thiserror::Error;
+use util::{extract_rec, DebugType};
 
 mod union_find;
 use union_find::{ClassIter, UnionFind};
+
+pub mod util;
 
 /// A set of types and type constraints.
 ///
@@ -249,8 +252,21 @@ where
     ///
     /// When the type index is not part of this type set.    
     #[inline]
-    pub fn get_type(&self, index: TypeIndex) -> Type<L> {
+    pub fn get(&self, index: TypeIndex) -> Type<L> {
         self.get_type_internal(self.canonical(index))
+    }
+
+    /// Returns a debug representation of the type at a given index.
+    ///
+    /// # Panics
+    ///
+    /// When the type index is not part of this type set.    
+    #[inline]
+    pub fn get_debug(&self, index: TypeIndex) -> DebugType<L>
+    where
+        L: Ord,
+    {
+        extract_rec(&self, |l| l, index)
     }
 
     /// Returns the representative of a [`TypeIndex`]s equivalence class.
@@ -367,6 +383,8 @@ where
     }
 
     fn unify_rows(&mut self, a: RowCons<L>, b: RowCons<L>) -> Result<(), SolveError> {
+        // TODO: This creates a lot of subrows.
+        // We can avoid this but that requires some allocation.
         if a.label == b.label {
             self.unify(a.value, b.value)?;
             self.unify(a.rest, b.rest)?;
@@ -374,10 +392,10 @@ where
             let (r, r_cons) = self.insert_row_cons(b.label);
             let (s, s_cons) = self.insert_row_cons(a.label);
             self.unify(r_cons.rest, s_cons.rest)?;
-            self.unify(r, a.rest)?;
             self.unify(r_cons.value, b.value)?;
-            self.unify(s, b.rest)?;
             self.unify(s_cons.value, a.value)?;
+            self.unify(r, a.rest)?;
+            self.unify(s, b.rest)?;
         }
 
         Ok(())
@@ -454,7 +472,7 @@ where
 
             stack.extend(self.parents(index));
 
-            if let Type::Ctr(_, cs) = self.get_type(index) {
+            if let Type::Ctr(_, cs) = self.get(index) {
                 if let State::Active | State::Solved = self.types[index.index()].state {
                     unsat_core.insert(index);
                     stack.extend(cs);
@@ -495,7 +513,7 @@ where
             assert_eq!(self.types[index.index()].state, State::Active);
             self.types[index.index()].state = State::Deferred;
 
-            let Type::Ctr(label, cs) = self.get_type(index) else {
+            let Type::Ctr(label, cs) = self.get(index) else {
                 panic!("invariant: a constraint must have been a type constructor");
             };
 
@@ -763,7 +781,7 @@ impl SolveError {
 }
 
 mod test {
-    use crate::TypeSet;
+    use crate::{util::extract_rec, TypeSet};
 
     #[test]
     fn test_rows() {
@@ -786,5 +804,10 @@ mod test {
         }
 
         types.unify(a, b).unwrap();
+
+        let a_rec = types.get_debug(a);
+        let b_rec = types.get_debug(b);
+
+        assert_eq!(a_rec, b_rec);
     }
 }

@@ -165,7 +165,7 @@ fn extract_type(
     vars: &mut IndexSet<TypeIndex>,
     index: TypeIndex,
 ) -> Option<Type> {
-    match solution.get_type(index) {
+    match solution.get(index) {
         libra_types::Type::Ctr(Label::Unify, _) => None,
         libra_types::Type::Ctr(Label::Fun, children) => {
             let arg = Box::new(extract_type(solution, vars, children.get(0))?);
