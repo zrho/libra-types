@@ -1,59 +1,93 @@
 # The Type System
 
+Libra implements a type system with parametric polymorphism inspired by
+[Hindley-Milner] but extended with a user-definable constraint language
+as in [`HM(X)`]. Through this extensible constraint language, a variety of
+type system features can be built upon Libra.
+
+ - **Extensibility:** 
+ - **Completeness:**
+ - **Performance:**
+
 ## Polymorphism
 
-We believe that [let should not be generalised](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/tldi10-vytiniotis.pdf).
+Since the type system is polymorphic, the type of a term can be left partially
+unspecified through type variables. 
+This allows us to write generic functions such as `rev: ∀a. List a -> List a` or
+`swap : ∀a b. Pair a b -> Pair b a`.
+Assuming the constraint system is well-behaved, Libra infers [principal types]
+for every term, i.e. a polymorphic type scheme so that every well-typed usage of the term
+is an instance of the inferred type.
+Principal types allow us to perform type inference on parts of a bigger program in isolation
+for modular, parallel and incremental compilation. 
+
+To keep type inference complete and decidable, we restrict to rank 1 polymorphism:
+universal quantifiers may not occur nested within a type. This is not a big
+restriction in practice, and higher rank types can be simulated with data types
+and existentials where desired.
+We also believe that [let should not be generalised](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/tldi10-vytiniotis.pdf).
 Classical Hindley Milner type systems perform type generalisation at local
-let bindings. Unfortunately this system is incompatible with a general
+let bindings, so that local variables are always assigned a polymorphic type.
+For example the expression `let f = λx. x in (f 0, f true)` would be well-typed
+classically, with the local variable `f` being assigned the type `∀a. a -> a`.
+Unfortunately this system is incompatible with a general
 and extensible constraint system. We therefore do not implement support
 for local implicit generalisation in libra. That design choice also paves
-the way for potential future support of [local assumptions](https://simon.peytonjones.org/outsideinx/).
+the way for potential future support of [local assumptions](https://simon.peytonjones.org/outsideinx/)
+and in particular GADTs.
 
 ## Row Types
 
-Libra supports a form of row types with [scoped labels].
-Rows can be used to model extensible records, variant and effects.
-A row is a sequence of row cons cells, specifying a label, a type and the
-rest of the row.
-Entries with different labels can be exchanged freely, while the order
-of entries with the same label must be preserved.
-This avoids label conflicts when using row polymorphism.
+Rows are labelled collections of types.
+Rows can be used to model extensible records, variants and [effects].
+Concretely a row is either the empty row `()`,
+a type variable `r` or a row extension `(l : t | r)` where `t`, `r` are types
+and `l` is a label. By unrolling consecutive row extensions we can write a row
+as `(l_1 : t_1, ..., l_n : t_n | r)` where `r` is one of the following:
+
+ - **Closed Row:** `r` is an empty row `()`.
+ - **Open Row:** `r` is a type variable.
+ - **Improper Row:** `r` is any other type.
+
+Improper rows are unusual and a type system that is built upon Libra might want
+to exclude them. We allow improper rows to avoid picking a kind system in Libra.
+
+Rows support [scoped labels]: row extensions with different labels can
+be exchanged freely, while the order of entries with the same label must be
+preserved.
+For instance we consider the rows `(x: Int, y: Float | r)` and `(y: Float, x: Int | r)`
+to be equal, while `(x: Int, x: Float | r)` and `(x: Float, x: Int | r)` are valid
+but different.
 In cases where duplicate labels are not desired, this can be enforced
 by using custom constraints.
+Duplicate labels can be useful to for scoped effects.
 
-Depending on the type that the row ends in, we classify rows as follows:
- - **Closed Row:** The sequence ends in an empty row.
- - **Open Row:** The sequence ends in a row variable.
- - **Improper Row:** The sequence ends in a type that is not a row.
+The label `l` in a row extension `(l : t | r)` is always a constant and can
+not be polymorphic.
+While we do not support rows with [first class labels] directly,
+this feature can be (partly) simulated using constraints.
 
-We currently do not support rows with [first class labels] directly,
-but this feature can be (partly) simulated using constraints as well.
+## Type Constraints
 
-## Constraint Based Type Inference
+Type constraints are the primary mechanism of extensibility in Libra and
+can be used to implement a variety of type system features.
 
-The intended usage of Libra is to infer or check the types of a program
-in three stages:
 
- 1. **Constraint Generation:** We traverse the input program and generate
-    types and type constraints in a `TypeSet` that together describe the type inference
-    problem associated to the program. During this process we keep track of
-    the association between locations in the program and the `TypeIndex`s
-    in the `TypeSet` that should correspond to the type of that program location.
+*Principal types and constraints*
 
- 2. **Constraint Solving:** Once all types and constraints are collected in the
-    `TypeSet`, we solve the type constraints. The `TypeSet` keeps track of
-    constraints that remain unsolved. For any such constraint, a user provided
-    procedure uses unification to incorporate the knowledge encoded in the
-    constraint into the `TypeSet`. The procedure can then decide whether to
-    consider the constraint solved, to signal an error or to postpone solving
-    the constraint to when more information becomes known.
-    Postponed constraints are reawakened when one of their referenced types changes.
+ <!-- - `Eq a`: Requires `a` to have a canonical equality operation. -->
+ <!-- - `Unique r`: Requires `r` to be a row without duplicate labels. -->
+ <!-- - `Inst(s) t`: Requires `t` to be an instance of a type scheme `s`. -->
 
-  
- 3. **Elaboration:** After all constraints are solved, we extract the type information
-    from the `TypeSet` to generate a program representation with type annotations.
-    This step uses the association between `TypeIndex`s and program locations that
-    has been recorded in the constraint generation step.
+<!-- A programming language with linear types can assign the type -->
+<!-- `∀a. Copy a => a -> Pair a a` -->
+<!-- to the expression -->
+<!-- `λx. (x, x)` -->
+<!-- to denote the requirement that the type of `x` must be copyable. -->
 
   [scoped labels]: https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/scopedlabels.pdf
   [first class labels]: https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/fclabels.pdf
+  [Hindley-Milner]: https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system
+  [`HM(X)`]: https://www.cs.tufts.edu/~nr/drop/tapos-final.pdf
+  [principal types]: https://en.wikipedia.org/wiki/Principal_type
+  [effects]: https://www.microsoft.com/en-us/research/wp-content/uploads/2016/12/algeff.pdf
