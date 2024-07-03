@@ -10,9 +10,9 @@
 - [Algebraic Data Types](./recipe_adt.md)
 - [Type Classes](./recipe_type_classes.md)
 - [Algebraic Effects](./recipe_effects.md)
-- [Values as Types]()
+- [Values as Types](./recipe_values.md)
 - [Portgraphs](./recipe_portgraph.md)
-- [Higher Rank Polymorphism]()
+- [Higher Rank Polymorphism](./recipe_rank_n.md)
 
 # Example
 

@@ -26,10 +26,11 @@ for modular, parallel and incremental compilation.
 
 To keep type inference complete and decidable, we restrict to rank 1 polymorphism:
 universal quantifiers may not occur nested within a type. This is not a big
-restriction in practice, and higher rank types can be simulated with data types
-and existentials where desired.
+restriction in practice, and [higher rank types] can still be emulated where they
+are needed.
+
 We also believe that [let should not be generalised](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/tldi10-vytiniotis.pdf).
-Classical Hindley Milner type systems perform type generalisation at local
+Classical Hindley Milner based type systems perform type generalisation at local
 let bindings, so that local variables are always assigned a polymorphic type.
 For example the expression `let f = λx. x in (f 0, f true)` would be well-typed
 classically, with the local variable `f` being assigned the type `∀a. a -> a`.
@@ -94,3 +95,4 @@ stuck while still being potentially solvable once more information becomes avail
 [variants]: ./recipe_adt.md#variants
 [effect polymorphism]: ./recipe_effects.md#effect-polymorphism
 [scoped effects]: ./recipe_effect.md#scoped-effects
+[higher rank types]: ./recipe_rank_n.md

@@ -5,6 +5,7 @@
 use std::{iter::FusedIterator, ops::Range};
 
 mod mycroft;
+pub mod recipes;
 mod type_set;
 mod union_find;
 pub mod util;
