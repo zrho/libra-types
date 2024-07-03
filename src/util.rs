@@ -1,5 +1,8 @@
-use crate::{Type, TypeIndex, TypeSet};
-use std::{borrow::Borrow, fmt::Debug, sync::Arc};
+use crate::type_set::TypeSet;
+use crate::{Type, TypeIndex};
+use std::borrow::Borrow;
+use std::fmt::Debug;
+use std::sync::Arc;
 
 /// A recursive representation of a type in a [`TypeSet`] for debugging.
 #[derive(Debug, Clone, PartialEq, Eq)]
