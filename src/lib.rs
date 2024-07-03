@@ -4,11 +4,13 @@
 //! [book]: https://zrho.github.io/libra-types/book/
 use std::{iter::FusedIterator, ops::Range};
 
+mod mycroft;
 mod type_set;
 mod union_find;
 pub mod util;
 
-pub use type_set::{ParentsIter, SolveError, State, TypeSet};
+pub use mycroft::run_mycroft;
+pub use type_set::{ParentsIter, SolveError, State, TypeSet, UnifyError};
 
 /// A row cons cell that represents an entry in a row.
 #[derive(Debug, Clone, Copy)]

@@ -198,7 +198,7 @@ where
     /// # Panics
     ///
     /// When the type index is not part of this type set.
-    pub fn unify(&mut self, a: TypeIndex, b: TypeIndex) -> Result<(), SolveError> {
+    pub fn unify(&mut self, a: TypeIndex, b: TypeIndex) -> Result<(), UnifyError> {
         // Unify the two types if they aren't already in the same equivalence class
         let a = self.canonical(a);
         let b = self.canonical(b);
@@ -223,48 +223,41 @@ where
 
         // Match the types and recursively unify if necessary
         match (self.get_type_internal(a), self.get_type_internal(b)) {
-            (Type::Error, _) => a,
-            (_, Type::Error) => b,
+            (Type::Error, _) | (_, Type::Error) => {}
+            (Type::Var(_), _) | (_, Type::Var(_)) => {}
 
             (Type::Ctr(a_label, a_args), Type::Ctr(b_label, b_args)) => {
                 if a_label != b_label {
                     self.record_error(a);
-                    return Err(SolveError::new(a));
+                    return Err(UnifyError::Mismatch(a));
                 }
 
                 if a_args.len() != b_args.len() {
                     self.record_error(a);
-                    return Err(SolveError::new(a));
+                    return Err(UnifyError::Mismatch(a));
                 }
 
                 for (a_arg, b_arg) in a_args.iter().zip(b_args) {
                     // TODO: Error context?
                     self.unify(a_arg, b_arg)?;
                 }
-
-                root
             }
 
-            (Type::RowEmpty, Type::RowEmpty) => root,
-
+            (Type::RowEmpty, Type::RowEmpty) => {}
             (Type::RowCons(a_row), Type::RowCons(b_row)) => {
                 self.unify_rows(a_row, b_row)?;
-                root
             }
-
-            (Type::Var(_), _) => b,
-            (_, Type::Var(_)) => a,
 
             _ => {
                 self.record_error(a);
-                return Err(SolveError::new(a));
+                return Err(UnifyError::Mismatch(a));
             }
         };
 
         Ok(())
     }
 
-    fn unify_check_cycle(&mut self, start: TypeIndex) -> Result<(), SolveError> {
+    fn unify_check_cycle(&mut self, start: TypeIndex) -> Result<(), UnifyError> {
         let start = self.canonical(start);
 
         // TODO: Reuse these allocations?
@@ -280,7 +273,7 @@ where
 
             if index == start {
                 self.record_error(start);
-                return Err(SolveError::new(start));
+                return Err(UnifyError::Cycle(start));
             }
 
             if let State::Deferred = self.state(index) {
@@ -294,7 +287,7 @@ where
         Ok(())
     }
 
-    fn unify_rows(&mut self, a: RowCons<L>, b: RowCons<L>) -> Result<(), SolveError> {
+    fn unify_rows(&mut self, a: RowCons<L>, b: RowCons<L>) -> Result<(), UnifyError> {
         // TODO: This creates a lot of subrows.
         // We can avoid this but that requires some allocation.
         if a.label == b.label {
@@ -503,18 +496,25 @@ pub enum State {
     Removed,
 }
 
+// TODO: Include more information in `UnifyError`.
+
+/// Error while unifying types.
+#[derive(Debug, Clone, Error)]
+pub enum UnifyError {
+    #[error("unification created a cycle")]
+    Cycle(TypeIndex),
+    #[error("mismatch")]
+    Mismatch(TypeIndex),
+}
+
 /// An error that occurred during type inference.
-#[derive(Debug, Error)]
-#[error("error while solving a constraint")]
-pub struct SolveError(TypeIndex);
+#[derive(Debug, Clone, Error)]
+#[error("type error while solving constraints")]
+pub struct SolveError;
 
-impl SolveError {
-    pub fn new(constraint: TypeIndex) -> Self {
-        SolveError(constraint)
-    }
-
-    pub fn constraint(&self) -> TypeIndex {
-        self.0
+impl From<UnifyError> for SolveError {
+    fn from(_: UnifyError) -> Self {
+        SolveError
     }
 }
 
