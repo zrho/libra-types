@@ -7,8 +7,8 @@
 
 # Recipes 
 
-- [Kinds](./recipe_kinds.md)
 - [Algebraic Data Types](./recipe_adt.md)
+- [Algebraic Effects](./recipe_effects.md)
 - [Type Classes](./recipe_type_classes.md)
 - [Primitive Types]()
 - [Type Lists]()

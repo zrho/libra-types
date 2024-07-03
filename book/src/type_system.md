@@ -39,7 +39,8 @@ and in particular GADTs.
 ## Row Types
 
 Rows are labelled collections of types.
-Rows can be used to model extensible records, variants and [effects].
+Rows can be used to model [extensible records and variants] and
+[algebraic effects].
 Concretely a row is either the empty row `()`,
 a type variable `r` or a row extension `(l : t | r)` where `t`, `r` are types
 and `l` is a label. By unrolling consecutive row extensions we can write a row
@@ -49,8 +50,10 @@ as `(l_1 : t_1, ..., l_n : t_n | r)` where `r` is one of the following:
  - **Open Row:** `r` is a type variable.
  - **Improper Row:** `r` is any other type.
 
+Through open rows we enable row polymorphism, on top of which we can build [extensible records and variants] and [effect polymorphism].
 Improper rows are unusual and a type system that is built upon Libra might want
-to exclude them. We allow improper rows to avoid picking a kind system in Libra.
+to exclude them, either by construction or by using the constraint system.
+We allow improper rows to avoid picking a kind system in Libra.
 
 Rows support [scoped labels]: row extensions with different labels can
 be exchanged freely, while the order of entries with the same label must be
@@ -60,7 +63,7 @@ to be equal, while `(x: Int, x: Float | r)` and `(x: Float, x: Int | r)` are val
 but different.
 In cases where duplicate labels are not desired, this can be enforced
 by using custom constraints.
-Duplicate labels can be useful to for scoped effects.
+Duplicate labels can be useful to for [scoped effects].
 
 The label `l` in a row extension `(l : t | r)` is always a constant and can
 not be polymorphic.
@@ -85,9 +88,12 @@ can be used to implement a variety of type system features.
 <!-- `λx. (x, x)` -->
 <!-- to denote the requirement that the type of `x` must be copyable. -->
 
-  [scoped labels]: https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/scopedlabels.pdf
-  [first class labels]: https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/fclabels.pdf
-  [Hindley-Milner]: https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system
-  [`HM(X)`]: https://www.cs.tufts.edu/~nr/drop/tapos-final.pdf
-  [principal types]: https://en.wikipedia.org/wiki/Principal_type
-  [effects]: https://www.microsoft.com/en-us/research/wp-content/uploads/2016/12/algeff.pdf
+[scoped labels]: https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/scopedlabels.pdf
+[first class labels]: https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/fclabels.pdf
+[Hindley-Milner]: https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system
+[`HM(X)`]: https://www.cs.tufts.edu/~nr/drop/tapos-final.pdf
+[principal types]: https://en.wikipedia.org/wiki/Principal_type
+[algebraic effects]: ./recipe_effects.md
+[extensible records and variants]: ./recipe_adt.md
+[effect polymorphism]: ./recipe_effects.md#extensible-records-and-variants
+[scoped effects]: ./recipe_effect.md#scoped-effects
