@@ -8,11 +8,11 @@
 # Recipes 
 
 - [Algebraic Data Types](./recipe_adt.md)
-- [Algebraic Effects](./recipe_effects.md)
 - [Type Classes](./recipe_type_classes.md)
-- [Primitive Types]()
-- [Type Lists]()
-- [Skolem Variables]()
+- [Algebraic Effects](./recipe_effects.md)
+- [Values as Types]()
+- [Portgraphs](./recipe_portgraph.md)
+- [Higher Rank Polymorphism]()
 
 # Example
 

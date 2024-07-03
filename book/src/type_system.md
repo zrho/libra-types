@@ -5,9 +5,12 @@ Libra implements a type system with parametric polymorphism inspired by
 as in [`HM(X)`]. Through this extensible constraint language, a variety of
 type system features can be built upon Libra.
 
- - **Extensibility:** 
- - **Completeness:**
- - **Performance:**
+**Extensibility:** 
+
+**Completeness:**
+Complete type inference is able to reconstruct the type of a program even in the absence of any type annotation. We value completeness since it enables robust program transformations.
+
+**Performance:**
 
 ## Polymorphism
 
@@ -39,7 +42,7 @@ and in particular GADTs.
 ## Row Types
 
 Rows are labelled collections of types.
-Rows can be used to model [extensible records and variants] and
+Rows can be used to model [records], [variants] and
 [algebraic effects].
 Concretely a row is either the empty row `()`,
 a type variable `r` or a row extension `(l : t | r)` where `t`, `r` are types
@@ -50,7 +53,8 @@ as `(l_1 : t_1, ..., l_n : t_n | r)` where `r` is one of the following:
  - **Open Row:** `r` is a type variable.
  - **Improper Row:** `r` is any other type.
 
-Through open rows we enable row polymorphism, on top of which we can build [extensible records and variants] and [effect polymorphism].
+Through open rows we enable row polymorphism, which enables extensibility for
+records and variants and [effect polymorphism].
 Improper rows are unusual and a type system that is built upon Libra might want
 to exclude them, either by construction or by using the constraint system.
 We allow improper rows to avoid picking a kind system in Libra.
@@ -75,18 +79,10 @@ this feature can be (partly) simulated using constraints.
 Type constraints are the primary mechanism of extensibility in Libra and
 can be used to implement a variety of type system features.
 
-
-*Principal types and constraints*
-
- <!-- - `Eq a`: Requires `a` to have a canonical equality operation. -->
- <!-- - `Unique r`: Requires `r` to be a row without duplicate labels. -->
- <!-- - `Inst(s) t`: Requires `t` to be an instance of a type scheme `s`. -->
-
-<!-- A programming language with linear types can assign the type -->
-<!-- `∀a. Copy a => a -> Pair a a` -->
-<!-- to the expression -->
-<!-- `λx. (x, x)` -->
-<!-- to denote the requirement that the type of `x` must be copyable. -->
+Constraint based type inference interacts well with the design choice to enable
+complete type inference and principal types. While unification constraints can
+either be solved or detected as unsolvable (leading to a type error), other constraints might get
+stuck while still being potentially solvable once more information becomes available.
 
 [scoped labels]: https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/scopedlabels.pdf
 [first class labels]: https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/fclabels.pdf
@@ -94,6 +90,7 @@ can be used to implement a variety of type system features.
 [`HM(X)`]: https://www.cs.tufts.edu/~nr/drop/tapos-final.pdf
 [principal types]: https://en.wikipedia.org/wiki/Principal_type
 [algebraic effects]: ./recipe_effects.md
-[extensible records and variants]: ./recipe_adt.md
-[effect polymorphism]: ./recipe_effects.md#extensible-records-and-variants
+[records]: ./recipe_adt.md#records
+[variants]: ./recipe_adt.md#variants
+[effect polymorphism]: ./recipe_effects.md#effect-polymorphism
 [scoped effects]: ./recipe_effect.md#scoped-effects
