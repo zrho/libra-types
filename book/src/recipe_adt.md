@@ -3,6 +3,8 @@
 ## Records
 
 A record is a product type with named fields, also known as a struct.
+Records are [structurally typed]: the type of a record is determined completely
+by the names and types of its fields, as opposed to its place of declaration or name.
 
 With rows we can represent the type of a record as follows:
 We introduce a type constructor `Record r` where `r` must be a row that
@@ -53,3 +55,6 @@ When open rows are used for variants, we can express tagged unions in which not
  - `inject(j): ∀a r. a -> Variant (l: a | r)`
  - `embed(j): ∀a r. Variant l -> Variant (l: a | r)`
  - `decompose(j): ∀a r. Variant (l: a | r) -> Result a (Variant r)`
+
+
+[structurally typed]: https://en.wikipedia.org/wiki/Structural_type_system
