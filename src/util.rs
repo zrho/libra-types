@@ -90,7 +90,7 @@ pub(crate) fn extract_rec<L, S, F>(
 ) -> DebugType<S>
 where
     F: FnMut(L) -> S + Copy,
-    L: Eq + Copy,
+    L: Ord + Copy,
     S: Ord,
 {
     match types.get(index) {
@@ -117,7 +117,7 @@ fn extract_row<L, S, F>(
 ) -> DebugRow<S>
 where
     F: FnMut(L) -> S + Copy,
-    L: Eq + Copy,
+    L: Ord + Copy,
     S: Ord,
 {
     let mut entries = Vec::new();

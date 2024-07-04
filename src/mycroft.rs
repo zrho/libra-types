@@ -21,7 +21,7 @@ use fxhash::FxHashSet;
 /// [A Practical Framework for Type Inference Error Explanation]: https://dl.acm.org/doi/10.1145/2983990.2983994
 pub fn run_mycroft<F, R, L>(type_set: &TypeSet<L>, mut solve: F) -> (R, TypeSet<L>)
 where
-    L: Eq + Copy,
+    L: Ord + Copy,
     F: FnMut(&mut TypeSet<L>) -> Result<R, SolveError>,
 {
     let mut unsat_cores: Vec<FxHashSet<TypeIndex>> = Vec::new();

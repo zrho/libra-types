@@ -29,7 +29,7 @@ pub struct TypeSet<L> {
 
 impl<L> TypeSet<L>
 where
-    L: Eq + Copy,
+    L: Ord + Copy,
 {
     /// Creates a new empty [`TypeSet`].
     pub fn new() -> Self {
@@ -244,8 +244,8 @@ where
             }
 
             (Type::RowEmpty, Type::RowEmpty) => {}
-            (Type::RowCons(a_row), Type::RowCons(b_row)) => {
-                self.unify_rows(a_row, b_row)?;
+            (Type::RowCons(_), Type::RowCons(_)) => {
+                self.unify_rows(a, b)?;
             }
 
             _ => {
@@ -287,23 +287,52 @@ where
         Ok(())
     }
 
-    fn unify_rows(&mut self, a: RowCons<L>, b: RowCons<L>) -> Result<(), UnifyError> {
-        // TODO: This creates a lot of subrows.
-        // We can avoid this but that requires some allocation.
-        if a.label == b.label {
-            self.unify(a.value, b.value)?;
-            self.unify(a.rest, b.rest)?;
-        } else {
-            let (r, r_cons) = self.insert_row_cons(b.label);
-            let (s, s_cons) = self.insert_row_cons(a.label);
-            self.unify(r_cons.rest, s_cons.rest)?;
-            self.unify(r_cons.value, b.value)?;
-            self.unify(s_cons.value, a.value)?;
-            self.unify(r, a.rest)?;
-            self.unify(s, b.rest)?;
+    /// Helper for [`Self::unify`] to unify two rows.
+    fn unify_rows(&mut self, a: TypeIndex, b: TypeIndex) -> Result<(), UnifyError> {
+        // TODO: Can we avoid the allocation here? We could at least reuse it.
+        let (a_entries, mut a_rest) = self.collect_sorted_row(a);
+        let (b_entries, mut b_rest) = self.collect_sorted_row(b);
+
+        // TODO: Provide context in the unify error?
+        for merged in util::merge_outer_join(a_entries, b_entries) {
+            match merged {
+                util::Merged::Left(label, value) => {
+                    let (cons_ix, cons) = self.insert_row_cons(label);
+                    self.unify(cons.value, value)?;
+                    self.unify(b_rest, cons_ix)?;
+                    b_rest = cons.rest;
+                }
+                util::Merged::Right(label, value) => {
+                    let (cons_ix, cons) = self.insert_row_cons(label);
+                    self.unify(cons.value, value)?;
+                    self.unify(a_rest, cons_ix)?;
+                    a_rest = cons.rest;
+                }
+                util::Merged::Both(_, a_value, b_value) => {
+                    self.unify(a_value, b_value)?;
+                }
+            }
         }
 
+        self.unify(a_rest, b_rest)?;
         Ok(())
+    }
+
+    /// Collect all entries of a row and sort them by their key.
+    /// Returns the sorted entries and the tail of the row.
+    /// The sort by key is stable so that the order of duplicate entries
+    /// is preserved.
+    fn collect_sorted_row(&mut self, mut index: TypeIndex) -> (Vec<(L, TypeIndex)>, TypeIndex) {
+        let mut entries = Vec::new();
+
+        while let Type::RowCons(cons) = self.get(index) {
+            entries.push((cons.label, cons.value));
+            index = cons.rest;
+        }
+
+        entries.sort_by_key(|(l, _)| *l);
+
+        (entries, index)
     }
 
     /// Mark a type as involved in a type error.
@@ -569,3 +598,99 @@ where
 }
 
 impl<'a, L> FusedIterator for ParentsIter<'a, L> where L: Eq + Copy {}
+
+mod util {
+    use std::iter::Peekable;
+
+    #[derive(Debug, Clone, Copy)]
+    pub enum Merged<K, V> {
+        /// The key was present only in the left collection.
+        Left(K, V),
+        /// The key was present only in the right collection.
+        Right(K, V),
+        /// The key was present in both collections
+        Both(K, V, V),
+    }
+
+    /// Perform an outer join on two collections of key/value pairs, sorted by key.
+    pub fn merge_outer_join<I, J, K, V>(
+        left: I,
+        right: J,
+    ) -> MergeOuterJoin<I::IntoIter, J::IntoIter>
+    where
+        I: IntoIterator,
+        J: IntoIterator,
+        I::IntoIter: Iterator<Item = (K, V)>,
+        J::IntoIter: Iterator<Item = (K, V)>,
+        K: Ord,
+    {
+        MergeOuterJoin {
+            left: left.into_iter().peekable(),
+            right: right.into_iter().peekable(),
+        }
+    }
+
+    /// Iterator returned by [`merge_outer_join`].
+    pub struct MergeOuterJoin<I, J>
+    where
+        I: Iterator,
+        J: Iterator,
+    {
+        left: Peekable<I>,
+        right: Peekable<J>,
+    }
+
+    impl<I, J, K, V> Iterator for MergeOuterJoin<I, J>
+    where
+        I: Iterator<Item = (K, V)>,
+        J: Iterator<Item = (K, V)>,
+        K: Ord,
+    {
+        type Item = Merged<K, V>;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            use std::cmp::Ordering;
+
+            match (self.left.peek(), self.right.peek()) {
+                (None, None) => None,
+                (None, Some(_)) => {
+                    let (k, v) = self.right.next()?;
+                    Some(Merged::Right(k, v))
+                }
+                (Some(_), None) => {
+                    let (k, v) = self.left.next()?;
+                    Some(Merged::Left(k, v))
+                }
+                (Some((k_left, _)), Some((k_right, _))) => match k_left.cmp(k_right) {
+                    Ordering::Less => {
+                        let (k, v) = self.left.next()?;
+                        Some(Merged::Left(k, v))
+                    }
+                    Ordering::Equal => {
+                        let (k, v_left) = self.left.next()?;
+                        let (_, v_right) = self.right.next()?;
+                        Some(Merged::Both(k, v_left, v_right))
+                    }
+                    Ordering::Greater => {
+                        let (k, v) = self.right.next()?;
+                        Some(Merged::Right(k, v))
+                    }
+                },
+            }
+        }
+
+        fn size_hint(&self) -> (usize, Option<usize>) {
+            let (left_min, left_max) = self.left.size_hint();
+            let (right_min, right_max) = self.right.size_hint();
+
+            let min = std::cmp::max(left_min, right_min);
+
+            let max = match (left_max, right_max) {
+                (Some(left_max), Some(right_max)) => Some(left_max + right_max),
+                _ => None,
+            };
+
+            (min, max)
+        }
+    }
+}

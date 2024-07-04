@@ -12,7 +12,7 @@ pub fn row_unique<L>(
     mut row: TypeIndex,
 ) -> Result<bool, LacksError<L>>
 where
-    L: Hash + Eq + Copy,
+    L: Hash + Ord + Copy,
 {
     // TODO: Allow to avoid repeated allocation by passing in the set
     let mut seen = FxHashSet::default();
@@ -46,7 +46,7 @@ pub fn row_lacks<F, L>(
 ) -> Result<bool, LacksError<L>>
 where
     F: FnMut(L) -> L,
-    L: Hash + Eq + Copy,
+    L: Hash + Ord + Copy,
 {
     let row_first = row;
 
@@ -90,7 +90,7 @@ pub struct LacksError<L>(pub TypeIndex, pub L);
 /// Ensure that a variable is never unified with any concrete type.
 pub fn skolem_var<L>(types: &mut TypeSet<L>, var: TypeIndex) -> Result<(), SkolemError>
 where
-    L: Eq + Copy,
+    L: Ord + Copy,
 {
     if let Type::Var(_) = types.get(var) {
         Ok(())

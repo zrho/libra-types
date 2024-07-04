@@ -14,7 +14,7 @@ indexmap = "2.2.6"
 rpds = "1.1.0"
 smol_str = "0.2.2"
 thiserror = "1.0.61"
-tinyvec = "1.6.1"
+tinyvec = { version = "1.6.1", features = ["alloc"] }
 
 [dev-dependencies]
 pest = "2.7.11"
