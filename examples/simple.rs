@@ -305,7 +305,7 @@ mod test {
 
     #[test]
     fn detect_cycle() {
-        let program = "fun f -> f f";
+        let program = "(fn (f) (f f))";
         let expr = program.parse().unwrap();
         let result = infer_type(&expr);
         assert!(result.is_err());

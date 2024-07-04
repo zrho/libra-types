@@ -371,16 +371,24 @@ where
         stack.extend(self.errors.iter().copied());
 
         while let Some(index) = stack.pop() {
+            let index = self.canonical(index);
+
             if !visited.insert(index) {
                 continue;
             }
 
             stack.extend(self.parents(index));
 
-            if let Type::Ctr(_, cs) = self.get(index) {
-                if let State::Active | State::Solved = self.types[index.index()].state {
-                    unsat_core.insert(index);
-                    stack.extend(cs);
+            if let State::Active | State::Solved = self.state(index) {
+                // Constraints can be unified with each other for deduplication.
+                // To ensure that we get the indices of all constraints that
+                // were involved in the error, we need to iterate over the
+                // concrete indices in the constraint's equivalence class.
+                for concrete_index in self.iter_class(index) {
+                    if let Type::Ctr(_, cs) = self.get_type_internal(concrete_index) {
+                        unsat_core.insert(index);
+                        stack.extend(cs);
+                    }
                 }
             }
         }
@@ -388,18 +396,28 @@ where
         unsat_core
     }
 
+    #[inline]
+    fn iter_class(&self, index: TypeIndex) -> impl ExactSizeIterator<Item = TypeIndex> + '_ {
+        self.uf.iter_class(index.index()).map(TypeIndex::new)
+    }
+
+    #[inline]
     pub fn mark_solved(&mut self, index: TypeIndex) {
+        let index = self.canonical(index);
         if let State::Active = self.types[index.index()].state {
             self.types[index.index()].state = State::Solved;
         }
     }
 
+    #[inline]
     pub fn mark_removed(&mut self, index: TypeIndex) {
+        let index = self.canonical(index);
         self.types[index.index()].state = State::Removed;
     }
 
     #[inline]
     pub fn state(&self, index: TypeIndex) -> State {
+        let index = self.canonical(index);
         self.types[index.index()].state
     }
 
@@ -429,6 +447,11 @@ where
         }
 
         None
+    }
+
+    #[inline]
+    pub fn size(&self) -> usize {
+        self.types.len()
     }
 }
 

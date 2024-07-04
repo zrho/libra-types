@@ -6,6 +6,8 @@ use std::{
 use crate::{SolveError, TypeIndex, TypeSet};
 use fxhash::FxHashSet;
 
+// TODO: Allow bailing out after a maximum number of retries.
+
 /// Attempts to solve a set of constraints or reports errors.
 ///
 /// In the case that the set of constraints is unsatisfiable, the algorithm from [A Practical
@@ -25,6 +27,16 @@ where
     let mut unsat_cores: Vec<FxHashSet<TypeIndex>> = Vec::new();
 
     loop {
+        // The solver mutates the type set. In the case of a type error, we must
+        // go back to the initial state of the type set to start a new attempt.
+        // We therefore must run the solver on a copy. Copying a `TypeSet`
+        // unfortunately is an O(n) operation, but amounts to a small and constant
+        // number of calls to `memcpy`.
+        //
+        // We may experiment with persistent data structures or rollbacks.
+        // It is very hard to beat the indexing and modification performance
+        // of a `Vec`, so in practice it might turn out to be faster to just
+        // take the copies.
         let mut type_set_copy = type_set.clone();
 
         for index in hitting_set(unsat_cores.clone()) {
@@ -33,8 +45,17 @@ where
 
         match solve(&mut type_set_copy) {
             Ok(result) => return (result, type_set_copy),
-            Err(SolveError) => unsat_cores.push(type_set_copy.unsat_core()),
+            Err(SolveError) => {}
         }
+
+        let mut unsat_core = type_set_copy.unsat_core();
+
+        // Constraints that were derived while running the solver can not be
+        // part of the error explanation. We therefore retain only those
+        // constraints that were part of the original problem.
+        unsat_core.retain(|i| i.index() < type_set.size());
+
+        unsat_cores.push(unsat_core);
     }
 }
 
