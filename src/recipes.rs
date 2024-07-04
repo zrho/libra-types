@@ -5,14 +5,13 @@ use thiserror::Error;
 use crate::{Type, TypeIndex, TypeSet};
 
 /// Ensure uniqueness of row labels.
-pub fn row_unique<L, F>(
+pub fn row_unique<L>(
     types: &mut TypeSet<L>,
-    mut label_to_lacks: F,
-    unique_label: L,
+    lacks_con: L,
+    unique_con: L,
     mut row: TypeIndex,
 ) -> Result<bool, LacksError<L>>
 where
-    F: FnMut(L) -> L,
     L: Hash + Eq + Copy,
 {
     // TODO: Allow to avoid repeated allocation by passing in the set
@@ -27,10 +26,11 @@ where
     }
 
     if let Type::Var(_) = types.get(row) {
-        types.insert_con(unique_label, [Some(row)]);
+        types.insert_con(unique_con, [Some(row)]);
 
         for label in seen.iter() {
-            types.insert_con((label_to_lacks)(*label), [Some(row)]);
+            let (label_proxy, _) = types.insert_ctr(*label, []);
+            types.insert_con(lacks_con, [Some(row), Some(label_proxy)]);
         }
     }
 
@@ -40,7 +40,7 @@ where
 /// Ensure that a row lacks a label.
 pub fn row_lacks<F, L>(
     types: &mut TypeSet<L>,
-    mut label_to_lacks: F,
+    lacks_con: L,
     label: L,
     mut row: TypeIndex,
 ) -> Result<bool, LacksError<L>>
@@ -63,7 +63,8 @@ where
     }
 
     if let Type::Var(_) = types.get(row) {
-        types.insert_con((label_to_lacks)(label), [Some(row)]);
+        let (label_proxy, _) = types.insert_ctr(label, []);
+        types.insert_con(lacks_con, [Some(row), Some(label_proxy)]);
     }
 
     Ok(true)
