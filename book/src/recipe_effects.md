@@ -9,7 +9,7 @@ Libra can be used to implement a similar typing scheme for algebraic effects.
 We can introduce a type constructor `a -[e]-> b` where `a` and `b` are input and output
 type of the function, and `e` is a row of effects.
 When `e` is the empty row, the function may perform no side effects and so
-`a -[()]- b` is the type of pure functions from `a` to `b`.
+`a -[()]-> b` is the type of pure functions from `a` to `b`.
 To keep the notation readable, we will write `a -> b` for `a -[()]-> b`.
 
  - `length: ∀e. String -[e]-> Int`

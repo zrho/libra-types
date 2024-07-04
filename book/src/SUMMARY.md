@@ -7,6 +7,8 @@
 
 # Recipes 
 
+- [Type Schemes](./recipe_type_schemes.md)
+- [Rows with Unique Labels](./recipe_row_unique.md)
 - [Algebraic Data Types](./recipe_adt.md)
 - [Type Classes](./recipe_type_classes.md)
 - [Algebraic Effects](./recipe_effects.md)
